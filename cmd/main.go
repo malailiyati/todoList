@@ -11,15 +11,11 @@ import (
 )
 
 func main() {
-	// Initialize DB
 	db := configs.InitDB()
-	// configs.MigrateDB(db)
 	log.Println("Database connected")
 
-	// Initialize router
 	r := routers.InitRouter(db)
 
-	// Run server
 	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "8080"
