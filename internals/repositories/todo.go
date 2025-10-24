@@ -23,7 +23,6 @@ func (r *TodoRepository) GetAll(search string, limit, offset int) ([]models.Todo
 		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
-	// ✅ urutkan: belum selesai dulu, lalu priority high > medium > low, terakhir id terbaru
 	query = query.
 		Order("completed ASC").
 		Order(`
@@ -46,10 +45,24 @@ func (r *TodoRepository) Create(todo *models.Todo) error {
 }
 
 func (r *TodoRepository) Update(id uint, data *models.Todo) (*models.Todo, error) {
-	result := r.DB.Model(&models.Todo{}).
-		Where("id = ?", id).
-		Select("title", "description", "priority", "completed", "category_id").
-		Updates(data)
+	updates := map[string]interface{}{}
+
+	if data.Title != "" {
+		updates["title"] = data.Title
+	}
+	if data.Description != "" {
+		updates["description"] = data.Description
+	}
+	if data.Priority != "" {
+		updates["priority"] = data.Priority
+	}
+	if data.CategoryID != nil {
+		updates["category_id"] = data.CategoryID
+	}
+
+	updates["completed"] = data.Completed
+
+	result := r.DB.Model(&models.Todo{}).Where("id = ?", id).Updates(updates)
 	if result.RowsAffected == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -66,7 +79,6 @@ func (r *TodoRepository) Update(id uint, data *models.Todo) (*models.Todo, error
 	return &updatedTodo, nil
 }
 
-// Delete
 func (r *TodoRepository) Delete(id uint) error {
 	result := r.DB.Delete(&models.Todo{}, id)
 	if result.RowsAffected == 0 {
@@ -75,7 +87,6 @@ func (r *TodoRepository) Delete(id uint) error {
 	return result.Error
 }
 
-// FindByID — biar bisa dipakai validasi di handler
 func (r *TodoRepository) FindByID(id uint) (*models.Todo, error) {
 	var todo models.Todo
 	err := r.DB.Preload("Category").First(&todo, id).Error
@@ -83,4 +94,13 @@ func (r *TodoRepository) FindByID(id uint) (*models.Todo, error) {
 		return nil, err
 	}
 	return &todo, nil
+}
+
+func (r *TodoRepository) CheckCategoryExists(categoryID uint) (bool, error) {
+	var exists bool
+	err := r.DB.Model(&models.Category{}).
+		Select("count(*) > 0").
+		Where("id = ?", categoryID).
+		Find(&exists).Error
+	return exists, err
 }
