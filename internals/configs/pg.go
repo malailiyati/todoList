@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 
-	// "github.com/malailiyati/todoList/internals/models"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -30,11 +28,3 @@ func InitDB() *gorm.DB {
 	log.Println("Connected to PostgreSQL")
 	return db
 }
-
-// func MigrateDB(db *gorm.DB) {
-// 	err := db.AutoMigrate(&models.Category{}, &models.Todo{})
-// 	if err != nil {
-// 		log.Fatalf("Migration failed: %v", err)
-// 	}
-// 	log.Println("Migration completed")
-// }
