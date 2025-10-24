@@ -3,7 +3,7 @@ CREATE TABLE public.todos (
   title VARCHAR(255),
   description TEXT,
   completed BOOLEAN DEFAULT FALSE,
-  category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+  category_id INT NULL REFERENCES categories(id) ON DELETE SET NULL,
   priority VARCHAR(10),
   due_date TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
