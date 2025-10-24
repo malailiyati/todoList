@@ -6,35 +6,30 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/malailiyati/todoList/internals/models"
-	"github.com/malailiyati/todoList/internals/repositories"
+	"github.com/malailiyati/todoList/internals/services"
 	"github.com/malailiyati/todoList/internals/utils"
 )
 
 type TodoHandler struct {
-	repo *repositories.TodoRepository
+	service *services.TodoService
 }
 
-func NewTodoHandler(repo *repositories.TodoRepository) *TodoHandler {
-	return &TodoHandler{repo}
+func NewTodoHandler(service *services.TodoService) *TodoHandler {
+	return &TodoHandler{service}
 }
 
 func (h *TodoHandler) GetAll(c *gin.Context) {
 	search := c.Query("search")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit := 10
-	offset := (page - 1) * limit
 
-	todos, total, err := h.repo.GetAll(search, limit, offset)
+	data, err := h.service.GetAll(search, page, limit)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	pagination := utils.NewPagination(page, limit, int(total))
-	utils.Success(c, http.StatusOK, "Todos fetched successfully", gin.H{
-		"todos":      todos,
-		"pagination": pagination,
-	})
+	utils.Success(c, http.StatusOK, "Todos fetched successfully", data)
 }
 
 func (h *TodoHandler) Create(c *gin.Context) {
@@ -44,30 +39,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Validate category_id if provided
-	if todo.CategoryID != 0 {
-		category, err := h.repo.CheckCategoryExists(todo.CategoryID)
-		if err != nil {
-			utils.Error(c, http.StatusInternalServerError, "Failed to check category")
-			return
-		}
-		if !category {
-			utils.Error(c, http.StatusBadRequest, "Invalid category_id")
-			return
-		}
-	}
-
-	// Validate priority value
-	if todo.Priority != "" &&
-		todo.Priority != "high" &&
-		todo.Priority != "medium" &&
-		todo.Priority != "low" {
-		utils.Error(c, http.StatusBadRequest, "Invalid priority (must be high, medium, or low)")
-		return
-	}
-
-	// Save to DB
-	if err := h.repo.Create(&todo); err != nil {
+	if err := h.service.Create(&todo); err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -82,78 +54,30 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Validate category_id if provided
-	if todo.CategoryID != 0 {
-		category, err := h.repo.CheckCategoryExists(todo.CategoryID)
-		if err != nil {
-			utils.Error(c, http.StatusInternalServerError, "Failed to check category")
-			return
-		}
-		if !category {
-			utils.Error(c, http.StatusBadRequest, "Invalid category_id")
-			return
-		}
-	}
-
-	// Validate priority if provided
-	if todo.Priority != "" &&
-		todo.Priority != "high" &&
-		todo.Priority != "medium" &&
-		todo.Priority != "low" {
-		utils.Error(c, http.StatusBadRequest, "Invalid priority (must be high, medium, or low)")
-		return
-	}
-
-	// Check if todo exists
-	existing, err := h.repo.FindByID(uint(id))
-	if err != nil {
-		utils.Error(c, http.StatusNotFound, "Todo not found")
-		return
-	}
-
-	// Preserve ID
-	todo.ID = existing.ID
-
-	updatedTodo, err := h.repo.Update(uint(id), &todo)
+	updated, err := h.service.Update(uint(id), &todo)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.Success(c, http.StatusOK, "Todo updated successfully", updatedTodo)
+	utils.Success(c, http.StatusOK, "Todo updated successfully", updated)
 }
 
 func (h *TodoHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-
-	if _, err := h.repo.FindByID(uint(id)); err != nil {
-		utils.Error(c, http.StatusNotFound, "Todo not found")
+	if err := h.service.Delete(uint(id)); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	if err := h.repo.Delete(uint(id)); err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-
 	utils.Success(c, http.StatusOK, "Todo deleted successfully", nil)
 }
 
 func (h *TodoHandler) ToggleComplete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 
-	todo, err := h.repo.FindByID(uint(id))
+	updated, err := h.service.ToggleComplete(uint(id))
 	if err != nil {
-		utils.Error(c, http.StatusNotFound, "Todo not found")
-		return
-	}
-
-	// Toggle status
-	todo.Completed = !todo.Completed
-
-	updated, err := h.repo.Update(uint(id), todo)
-	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, "Failed to update todo status")
+		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -162,4 +86,14 @@ func (h *TodoHandler) ToggleComplete(c *gin.Context) {
 		status = "marked as complete"
 	}
 	utils.Success(c, http.StatusOK, "Todo "+status, updated)
+}
+
+func (h *TodoHandler) GetByID(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	todo, err := h.service.GetByID(uint(id))
+	if err != nil {
+		utils.Error(c, http.StatusNotFound, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, "Todo fetched successfully", todo)
 }
