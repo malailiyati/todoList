@@ -6,18 +6,21 @@ import (
 
 	"github.com/malailiyati/todoList/internals/handlers"
 	"github.com/malailiyati/todoList/internals/repositories"
+	"github.com/malailiyati/todoList/internals/services"
 )
 
 func InitRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default()
 
-	// Initialize repository & handler
 	categoryRepo := repositories.NewCategoryRepository(db)
 	todoRepo := repositories.NewTodoRepository(db)
-	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
-	todoHandler := handlers.NewTodoHandler(todoRepo)
 
-	// Routes
+	categoryService := services.NewCategoryService(categoryRepo)
+	todoService := services.NewTodoService(todoRepo, categoryRepo)
+
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
+	todoHandler := handlers.NewTodoHandler(todoService)
+
 	api := r.Group("/api")
 	{
 		api.GET("/categories", categoryHandler.GetAll)
@@ -27,6 +30,7 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 
 		api.GET("/todos", todoHandler.GetAll)
 		api.POST("/todos", todoHandler.Create)
+		api.GET("/todos/:id", todoHandler.GetByID)
 		api.PATCH("/todos/:id", todoHandler.Update)
 		api.DELETE("/todos/:id", todoHandler.Delete)
 		api.PATCH("/todos/:id/complete", todoHandler.ToggleComplete)
